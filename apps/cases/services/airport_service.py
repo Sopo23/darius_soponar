@@ -1,9 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
+from functools import lru_cache
 
+import airportsdata
+import pycountry
 import requests
 from django.conf import settings
+
+
+AIRPORT_SEARCH_RESULT_LIMIT = 10
 
 
 class AirportLookupError(Exception):
@@ -22,6 +29,42 @@ class AirportRecord:
     country: str | None
 
 
+@dataclass(slots=True)
+class AirportDistanceResult:
+    from_airport_code: str
+    to_airport_code: str
+    kilometers: Decimal
+
+
+@lru_cache(maxsize=1)
+def _load_airport_records() -> tuple[AirportRecord, ...]:
+    records = []
+    for airport_code, attributes in airportsdata.load("IATA").items():
+        normalized_code = (attributes.get("iata") or airport_code or "").upper()
+        if len(normalized_code) != 3:
+            continue
+        records.append(
+            AirportRecord(
+                code=normalized_code,
+                name=attributes.get("name") or normalized_code,
+                city=attributes.get("city") or None,
+                country=_resolve_country_name(attributes.get("country")),
+            )
+        )
+    return tuple(records)
+
+
+@lru_cache(maxsize=512)
+def _resolve_country_name(country_code: str | None) -> str | None:
+    if not country_code:
+        return None
+
+    country = pycountry.countries.get(alpha_2=country_code.upper())
+    if country is None:
+        return country_code.upper()
+    return country.name
+
+
 class AirportService:
     def __init__(self, *, base_url: str | None = None, session: requests.Session | None = None) -> None:
         self.base_url = (base_url or settings.AIRPORTGAP_BASE_URL).rstrip("/")
@@ -33,28 +76,17 @@ class AirportService:
         if not normalized_query:
             return []
 
-        if len(normalized_query) == 3 and normalized_query.isalpha():
-            try:
-                return [self.get_airport(normalized_query)]
-            except AirportProviderUnavailableError:
-                raise
-            except AirportLookupError:
-                return []
-
-        payload = self._get_json("/api/airports")
         matches = []
+        seen_codes = set()
         lowered_query = normalized_query.lower()
-        for item in payload.get("data", []):
-            airport = self._build_airport_record(item)
-            if airport is None:
+        for airport in _load_airport_records():
+            if airport.code in seen_codes:
                 continue
-            haystacks = [airport.code.lower(), airport.name.lower()]
-            if airport.city:
-                haystacks.append(airport.city.lower())
-            if airport.country:
-                haystacks.append(airport.country.lower())
-            if any(lowered_query in haystack for haystack in haystacks):
+            if self._matches_query(airport, lowered_query):
                 matches.append(airport)
+                seen_codes.add(airport.code)
+                if len(matches) >= AIRPORT_SEARCH_RESULT_LIMIT:
+                    break
         return matches
 
     def get_airport(self, airport_code: str) -> AirportRecord:
@@ -67,6 +99,30 @@ class AirportService:
 
     def ensure_airport_exists(self, airport_code: str) -> AirportRecord:
         return self.get_airport(airport_code)
+
+    def calculate_distance(self, *, from_airport_code: str, to_airport_code: str) -> AirportDistanceResult:
+        payload = self._post_json(
+            "/api/airports/distance",
+            data={
+                "from": from_airport_code.upper(),
+                "to": to_airport_code.upper(),
+            },
+        )
+        attributes = payload.get("data", {}).get("attributes", {})
+        kilometers = Decimal(str(attributes.get("kilometers", "0")))
+        return AirportDistanceResult(
+            from_airport_code=from_airport_code.upper(),
+            to_airport_code=to_airport_code.upper(),
+            kilometers=kilometers,
+        )
+
+    def _matches_query(self, airport: AirportRecord, lowered_query: str) -> bool:
+        haystacks = [airport.code.lower(), airport.name.lower()]
+        if airport.city:
+            haystacks.append(airport.city.lower())
+        if airport.country:
+            haystacks.append(airport.country.lower())
+        return any(lowered_query in haystack for haystack in haystacks)
 
     def _get_json(self, path: str, *, allow_not_found: bool = False) -> dict:
         try:
@@ -86,6 +142,27 @@ class AirportService:
 
         if allow_not_found and response.status_code == 404:
             return {}
+        if response.status_code != 200:
+            raise AirportProviderUnavailableError("Airport provider unavailable")
+        return response.json()
+
+    def _post_json(self, path: str, *, data: dict) -> dict:
+        try:
+            response = self.session.post(
+                f"{self.base_url}{path}",
+                data=data,
+                timeout=10,
+                verify=self.verify,
+            )
+        except requests.exceptions.SSLError as exc:
+            raise AirportProviderUnavailableError(
+                "Airport provider SSL verification failed. Configure AIRPORTGAP_CA_BUNDLE "
+                "or set AIRPORTGAP_VERIFY_SSL=False for local development if your network "
+                "intercepts HTTPS traffic."
+            ) from exc
+        except requests.exceptions.RequestException as exc:
+            raise AirportProviderUnavailableError("Airport provider unavailable") from exc
+
         if response.status_code != 200:
             raise AirportProviderUnavailableError("Airport provider unavailable")
         return response.json()

@@ -112,3 +112,14 @@ class AirportResultSerializer(serializers.Serializer):
     name = serializers.CharField()
     city = serializers.CharField(allow_null=True)
     country = serializers.CharField(allow_null=True)
+
+
+class CompensationPreviewSerializer(serializers.Serializer):
+    departure_airport_code = serializers.CharField(max_length=3, min_length=3)
+    arrival_airport_code = serializers.CharField(max_length=3, min_length=3)
+
+    def validate_departure_airport_code(self, value: str) -> str:
+        return value.upper()
+
+    def validate_arrival_airport_code(self, value: str) -> str:
+        return value.upper()

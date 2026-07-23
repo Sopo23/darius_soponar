@@ -1,5 +1,6 @@
 import json
 from datetime import date
+from decimal import Decimal
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -7,7 +8,7 @@ from rest_framework.test import APIClient
 
 from apps.cases.constants import DocumentType
 from apps.cases.services.account_service import PassengerAccountService
-from apps.cases.services.airport_service import AirportRecord
+from apps.cases.services.airport_service import AirportDistanceResult, AirportRecord
 from apps.cases.services.case_service import CaseCreationService
 
 
@@ -110,6 +111,13 @@ class StubAirportService:
 
     def ensure_airport_exists(self, airport_code):
         return AirportRecord(code=airport_code.upper(), name=airport_code.upper(), city=None, country=None)
+
+    def calculate_distance(self, *, from_airport_code, to_airport_code):
+        return AirportDistanceResult(
+            from_airport_code=from_airport_code.upper(),
+            to_airport_code=to_airport_code.upper(),
+            kilometers=Decimal("1871.00"),
+        )
 
 
 @pytest.fixture

@@ -5,7 +5,15 @@ from .models import Case, CaseDocument, FlightSegment
 
 @admin.register(Case)
 class CaseAdmin(admin.ModelAdmin):
-    list_display = ("id", "owner", "status", "contact_email", "created_at")
+    list_display = (
+        "id",
+        "owner",
+        "status",
+        "contact_email",
+        "orthodromic_distance_km",
+        "compensation_amount_eur",
+        "created_at",
+    )
     list_filter = ("status", "created_at")
     search_fields = ("contact_email", "owner__email")
     readonly_fields = ("created_at", "updated_at")
