@@ -7,6 +7,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.cases.serializers import AirportQuerySerializer, AirportResultSerializer, CaseCreateSerializer
+from apps.cases.constants import (
+    COMPENSATION_AMOUNT_LONG_HAUL_EUR,
+    COMPENSATION_AMOUNT_MEDIUM_HAUL_EUR,
+    COMPENSATION_AMOUNT_SHORT_HAUL_EUR,
+    COMPENSATION_THRESHOLD_MEDIUM_HAUL_KM,
+    COMPENSATION_THRESHOLD_SHORT_HAUL_KM,
+)
+from apps.cases.serializers import CompensationPreviewSerializer
 from apps.cases.services.account_service import PassengerAccountService
 from apps.cases.services.airport_service import (
     AirportLookupError,
@@ -97,3 +105,42 @@ class AirportSearchView(APIView):
 
         response_serializer = AirportResultSerializer(airports, many=True)
         return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+
+class CompensationPreviewView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = CompensationPreviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        service = AirportService(base_url=settings.AIRPORTGAP_BASE_URL)
+        try:
+            service.ensure_airport_exists(serializer.validated_data["departure_airport_code"])
+            service.ensure_airport_exists(serializer.validated_data["arrival_airport_code"])
+            distance_result = service.calculate_distance(
+                from_airport_code=serializer.validated_data["departure_airport_code"],
+                to_airport_code=serializer.validated_data["arrival_airport_code"],
+            )
+        except AirportProviderUnavailableError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        except AirportLookupError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        compensation_amount = self._calculate_compensation_amount(distance_result.kilometers)
+        return Response(
+            {
+                "departure_airport_code": distance_result.from_airport_code,
+                "arrival_airport_code": distance_result.to_airport_code,
+                "orthodromic_distance_km": f"{distance_result.kilometers:.2f}",
+                "compensation_amount_eur": compensation_amount,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def _calculate_compensation_amount(self, distance_km):
+        if distance_km < COMPENSATION_THRESHOLD_SHORT_HAUL_KM:
+            return COMPENSATION_AMOUNT_SHORT_HAUL_EUR
+        if distance_km <= COMPENSATION_THRESHOLD_MEDIUM_HAUL_KM:
+            return COMPENSATION_AMOUNT_MEDIUM_HAUL_EUR
+        return COMPENSATION_AMOUNT_LONG_HAUL_EUR

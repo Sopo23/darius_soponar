@@ -95,6 +95,13 @@ export function searchAirports(search) {
   return apiRequest(`/api/airports/?search=${encodeURIComponent(search)}`)
 }
 
+export function previewCompensation(payload) {
+  return apiRequest('/api/cases/compensation-preview/', {
+    method: 'POST',
+    body: payload,
+  })
+}
+
 export function createCase(token, formData) {
   return apiRequest('/api/cases/', {
     method: 'POST',

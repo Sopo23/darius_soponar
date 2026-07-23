@@ -350,6 +350,44 @@ input:focus {
   color: var(--ink-soft);
 }
 
+.compensation-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.preview-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.preview-card {
+  display: grid;
+  gap: 8px;
+  padding: 20px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.preview-card strong {
+  font-size: 1.5rem;
+  line-height: 1.1;
+}
+
+.preview-card small {
+  color: var(--ink-soft);
+}
+
+.highlight-card {
+  background: linear-gradient(135deg, rgba(14, 116, 144, 0.14), rgba(217, 119, 6, 0.14));
+}
+
+.neutral-pill {
+  background: rgba(14, 116, 144, 0.1);
+  color: var(--accent-strong);
+}
+
 .form-actions {
   display: grid;
   gap: 12px;
@@ -358,7 +396,8 @@ input:focus {
 @media (max-width: 920px) {
   .topbar,
   .page-grid,
-  .form-section-grid {
+  .form-section-grid,
+  .preview-grid {
     grid-template-columns: 1fr;
   }
 

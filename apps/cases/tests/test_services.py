@@ -5,7 +5,7 @@ import pytest
 from django.core.exceptions import ValidationError
 
 from apps.cases.models import Case
-from apps.cases.services.airport_service import AirportDistanceResult
+from apps.cases.services.airport_service import AirportDistanceResult, AirportService
 
 
 @pytest.mark.django_db
@@ -135,3 +135,29 @@ def test_distance_uses_first_departure_and_final_arrival(valid_case_payload):
 
     assert airport_service.distance_calls == [("OTP", "MAD")]
     assert case.compensation_amount_eur == 600
+
+
+def test_airport_search_uses_local_index(monkeypatch):
+    monkeypatch.setattr(
+        'apps.cases.services.airport_service._load_airport_records',
+        lambda: (
+            __import__('apps.cases.services.airport_service', fromlist=['AirportRecord']).AirportRecord(
+                code='GKA',
+                name='Goroka Airport',
+                city='Goroka',
+                country='Papua New Guinea',
+            ),
+            __import__('apps.cases.services.airport_service', fromlist=['AirportRecord']).AirportRecord(
+                code='OTP',
+                name='Henri Coanda International Airport',
+                city='Bucharest',
+                country='Romania',
+            ),
+        ),
+    )
+
+    service = AirportService(base_url='https://example.test')
+
+    results = service.search('bucharest')
+
+    assert [airport.code for airport in results] == ['OTP']

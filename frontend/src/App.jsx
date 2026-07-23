@@ -16,6 +16,7 @@ import {
   fetchCurrentUser,
   login,
   logout,
+  previewCompensation,
   requestPasswordReset,
   searchAirports,
 } from './api'
@@ -417,9 +418,61 @@ function CaseCreatePage({ session }) {
   const [airportQuery, setAirportQuery] = useState('')
   const [airportResults, setAirportResults] = useState([])
   const [airportState, setAirportState] = useState({ busy: false, error: '' })
+  const [compensationPreview, setCompensationPreview] = useState({
+    busy: false,
+    error: '',
+    data: null,
+  })
   const [submitState, setSubmitState] = useState({ busy: false, error: '', success: '' })
 
+  const sortedSegments = [...flightSegments].sort((left, right) => left.sequence_number - right.sequence_number)
+  const departureAirportCode = sortedSegments[0]?.departure_airport_code?.trim() ?? ''
+  const arrivalAirportCode = sortedSegments.at(-1)?.arrival_airport_code?.trim() ?? ''
+
+  useEffect(() => {
+    if (departureAirportCode.length !== 3 || arrivalAirportCode.length !== 3) {
+      return undefined
+    }
+
+    let isActive = true
+    const timeoutId = window.setTimeout(async () => {
+      setCompensationPreview((currentState) => ({
+        ...currentState,
+        busy: true,
+        error: '',
+      }))
+
+      try {
+        const payload = await previewCompensation({
+          departure_airport_code: departureAirportCode,
+          arrival_airport_code: arrivalAirportCode,
+        })
+        if (!isActive) {
+          return
+        }
+        setCompensationPreview({ busy: false, error: '', data: payload })
+      } catch (error) {
+        if (!isActive) {
+          return
+        }
+        setCompensationPreview({ busy: false, error: error.message, data: null })
+      }
+    }, 350)
+
+    return () => {
+      isActive = false
+      window.clearTimeout(timeoutId)
+    }
+  }, [arrivalAirportCode, departureAirportCode])
+
+  function clearCompensationPreview() {
+    setCompensationPreview({ busy: false, error: '', data: null })
+  }
+
   function updateFlightSegment(index, fieldName, value) {
+    if (fieldName === 'departure_airport_code' || fieldName === 'arrival_airport_code') {
+      clearCompensationPreview()
+    }
     setFlightSegments((currentSegments) =>
       currentSegments.map((segment, segmentIndex) => {
         if (segmentIndex !== index) {
@@ -440,6 +493,7 @@ function CaseCreatePage({ session }) {
   }
 
   function addConnectingFlight() {
+    clearCompensationPreview()
     setFlightSegments((currentSegments) => {
       if (currentSegments.length >= 5) {
         return currentSegments
@@ -449,6 +503,7 @@ function CaseCreatePage({ session }) {
   }
 
   function removeFlight(index) {
+    clearCompensationPreview()
     setFlightSegments((currentSegments) =>
       currentSegments
         .filter((_, segmentIndex) => segmentIndex !== index)
@@ -464,7 +519,7 @@ function CaseCreatePage({ session }) {
   }
 
   async function handleAirportLookup(event) {
-    event.preventDefault()
+    event?.preventDefault()
     setAirportState({ busy: true, error: '' })
     try {
       const results = await searchAirports(airportQuery)
@@ -497,10 +552,22 @@ function CaseCreatePage({ session }) {
 
     try {
       const payload = await createCase(session.token, formData)
+      setCompensationPreview({
+        busy: false,
+        error: '',
+        data: {
+          orthodromic_distance_km: payload.orthodromic_distance_km,
+          compensation_amount_eur: payload.compensation_amount_eur,
+          departure_airport_code: payload.flight_segments[0]?.departure_airport_code,
+          arrival_airport_code: payload.flight_segments.at(-1)?.arrival_airport_code,
+        },
+      })
       setSubmitState({
         busy: false,
         error: '',
-        success: `Case #${payload.id} created with status ${payload.status}.`,
+        success:
+          `Case #${payload.id} created with status ${payload.status}. ` +
+          `Distance: ${payload.orthodromic_distance_km} km. Compensation: €${payload.compensation_amount_eur}.`,
       })
     } catch (error) {
       setSubmitState({ busy: false, error: error.message, success: '' })
@@ -662,6 +729,45 @@ function CaseCreatePage({ session }) {
             </div>
           </section>
 
+          <section className="subpanel compensation-panel">
+            <div className="section-header compact">
+              <div>
+                <h3>CASE_02 compensation preview</h3>
+                <p className="helper-text">
+                  Calculated from the first departure and final destination only. Connecting-flight
+                  legs are not included in the orthodromic distance calculation.
+                </p>
+              </div>
+              <span className="status-pill neutral-pill">
+                {compensationPreview.busy ? 'Recalculating...' : 'Auto recalculation active'}
+              </span>
+            </div>
+            <div className="preview-grid">
+              <article className="preview-card">
+                <span className="callout-label">Distance</span>
+                <strong>
+                  {compensationPreview.data?.orthodromic_distance_km
+                    ? `${compensationPreview.data.orthodromic_distance_km} km`
+                    : 'Waiting for valid airports'}
+                </strong>
+                <small>
+                  Route: {(compensationPreview.data?.departure_airport_code ?? departureAirportCode) || '---'} to{' '}
+                  {(compensationPreview.data?.arrival_airport_code ?? arrivalAirportCode) || '---'}
+                </small>
+              </article>
+              <article className="preview-card highlight-card">
+                <span className="callout-label">Compensation</span>
+                <strong>
+                  {compensationPreview.data?.compensation_amount_eur
+                    ? `€${compensationPreview.data.compensation_amount_eur}`
+                    : 'Not available yet'}
+                </strong>
+                <small>Thresholds: under 1500 km = €250, up to 3500 km = €400, above = €600.</small>
+              </article>
+            </div>
+            {compensationPreview.error ? <p className="feedback error">{compensationPreview.error}</p> : null}
+          </section>
+
           <div className="form-section-grid">
             <section className="subpanel">
               <h3>Required documents</h3>
@@ -691,21 +797,26 @@ function CaseCreatePage({ session }) {
 
             <section className="subpanel">
               <h3>Airport lookup helper</h3>
-              <form className="form-stack" onSubmit={handleAirportLookup}>
+              <div className="form-stack">
                 <label>
                   Search by IATA code, airport, city, or country
                   <input
                     type="text"
                     value={airportQuery}
                     onChange={(event) => setAirportQuery(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        handleAirportLookup(event)
+                      }
+                    }}
                     placeholder="OTP, Bucharest, Romania"
                   />
                 </label>
-                <button type="submit" disabled={airportState.busy}>
+                <button type="button" disabled={airportState.busy} onClick={handleAirportLookup}>
                   {airportState.busy ? 'Searching...' : 'Search airports'}
                 </button>
                 {airportState.error ? <p className="feedback error">{airportState.error}</p> : null}
-              </form>
+              </div>
               <ul className="airport-results">
                 {airportResults.map((airport) => (
                   <li key={`${airport.code}-${airport.name}`}>
@@ -723,7 +834,7 @@ function CaseCreatePage({ session }) {
 
           <div className="form-actions">
             <button type="submit" disabled={submitState.busy}>
-              {submitState.busy ? 'Submitting case...' : 'Submit CASE_01'}
+              {submitState.busy ? 'Submitting case...' : 'Submit CASE_01 and CASE_02'}
             </button>
             {submitState.error ? <p className="feedback error">{submitState.error}</p> : null}
             {submitState.success ? <p className="feedback success">{submitState.success}</p> : null}

@@ -127,3 +127,33 @@ def test_case_creation_returns_503_when_airport_provider_ssl_fails(api_client, m
 
     assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
     assert "SSL verification failed" in response.data["detail"]
+
+
+@pytest.mark.django_db
+def test_compensation_preview_returns_distance_and_amount(api_client, monkeypatch):
+    monkeypatch.setattr(
+        "apps.cases.services.airport_service.AirportService.ensure_airport_exists",
+        lambda self, code: AirportRecord(code=code, name=code, city=None, country=None),
+    )
+    monkeypatch.setattr(
+        "apps.cases.services.airport_service.AirportService.calculate_distance",
+        lambda self, from_airport_code, to_airport_code: __import__(
+            "apps.cases.services.airport_service", fromlist=["AirportDistanceResult"]
+        ).AirportDistanceResult(
+            from_airport_code=from_airport_code,
+            to_airport_code=to_airport_code,
+            kilometers=3499.99,
+        ),
+    )
+
+    response = api_client.post(
+        "/api/cases/compensation-preview/",
+        data={"departure_airport_code": "otp", "arrival_airport_code": "mad"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["departure_airport_code"] == "OTP"
+    assert response.data["arrival_airport_code"] == "MAD"
+    assert response.data["orthodromic_distance_km"] == "3499.99"
+    assert response.data["compensation_amount_eur"] == 400
