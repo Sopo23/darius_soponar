@@ -51,6 +51,10 @@ class CaseCreateView(APIView):
             "id": case.id,
             "status": case.status,
             "contact_email": case.contact_email,
+            "orthodromic_distance_km": (
+                f"{case.orthodromic_distance_km:.2f}" if case.orthodromic_distance_km is not None else None
+            ),
+            "compensation_amount_eur": case.compensation_amount_eur,
             "created_at": case.created_at,
             "flight_segments": [
                 {

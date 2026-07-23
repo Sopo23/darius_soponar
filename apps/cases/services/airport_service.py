@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 
 import requests
 from django.conf import settings
@@ -20,6 +21,13 @@ class AirportRecord:
     name: str
     city: str | None
     country: str | None
+
+
+@dataclass(slots=True)
+class AirportDistanceResult:
+    from_airport_code: str
+    to_airport_code: str
+    kilometers: Decimal
 
 
 class AirportService:
@@ -68,6 +76,22 @@ class AirportService:
     def ensure_airport_exists(self, airport_code: str) -> AirportRecord:
         return self.get_airport(airport_code)
 
+    def calculate_distance(self, *, from_airport_code: str, to_airport_code: str) -> AirportDistanceResult:
+        payload = self._post_json(
+            "/api/airports/distance",
+            data={
+                "from": from_airport_code.upper(),
+                "to": to_airport_code.upper(),
+            },
+        )
+        attributes = payload.get("data", {}).get("attributes", {})
+        kilometers = Decimal(str(attributes.get("kilometers", "0")))
+        return AirportDistanceResult(
+            from_airport_code=from_airport_code.upper(),
+            to_airport_code=to_airport_code.upper(),
+            kilometers=kilometers,
+        )
+
     def _get_json(self, path: str, *, allow_not_found: bool = False) -> dict:
         try:
             response = self.session.get(
@@ -86,6 +110,27 @@ class AirportService:
 
         if allow_not_found and response.status_code == 404:
             return {}
+        if response.status_code != 200:
+            raise AirportProviderUnavailableError("Airport provider unavailable")
+        return response.json()
+
+    def _post_json(self, path: str, *, data: dict) -> dict:
+        try:
+            response = self.session.post(
+                f"{self.base_url}{path}",
+                data=data,
+                timeout=10,
+                verify=self.verify,
+            )
+        except requests.exceptions.SSLError as exc:
+            raise AirportProviderUnavailableError(
+                "Airport provider SSL verification failed. Configure AIRPORTGAP_CA_BUNDLE "
+                "or set AIRPORTGAP_VERIFY_SSL=False for local development if your network "
+                "intercepts HTTPS traffic."
+            ) from exc
+        except requests.exceptions.RequestException as exc:
+            raise AirportProviderUnavailableError("Airport provider unavailable") from exc
+
         if response.status_code != 200:
             raise AirportProviderUnavailableError("Airport provider unavailable")
         return response.json()

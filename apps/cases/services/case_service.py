@@ -2,12 +2,20 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from apps.cases.constants import DocumentType, MAX_CONNECTING_FLIGHTS, MAX_TOTAL_FLIGHTS
+from apps.cases.constants import (
+    COMPENSATION_AMOUNT_LONG_HAUL_EUR,
+    COMPENSATION_AMOUNT_MEDIUM_HAUL_EUR,
+    COMPENSATION_AMOUNT_SHORT_HAUL_EUR,
+    COMPENSATION_THRESHOLD_MEDIUM_HAUL_KM,
+    COMPENSATION_THRESHOLD_SHORT_HAUL_KM,
+    DocumentType,
+    MAX_CONNECTING_FLIGHTS,
+    MAX_TOTAL_FLIGHTS,
+)
 from apps.cases.models import Case, CaseDocument, FlightSegment
 
 
@@ -32,6 +40,8 @@ class CaseCreationService:
         self._validate_documents(documents)
         self._validate_gdpr_consent(validated_data.get("gdpr_consent"))
         self._validate_airports(flight_segments)
+        distance_result = self._calculate_distance(flight_segments)
+        compensation_amount = self._calculate_compensation_amount(distance_result.kilometers)
 
         owner = self._resolve_owner(
             authenticated_user=authenticated_user,
@@ -45,6 +55,8 @@ class CaseCreationService:
             contact_email=passenger["email"],
             gdpr_consent=True,
             gdpr_consented_at=timezone.now(),
+            orthodromic_distance_km=distance_result.kilometers,
+            compensation_amount_eur=compensation_amount,
         )
 
         self._create_flight_segments(case=case, flight_segments=flight_segments)
@@ -86,6 +98,20 @@ class CaseCreationService:
         for flight_segment in flight_segments:
             self.airport_service.ensure_airport_exists(flight_segment["departure_airport_code"])
             self.airport_service.ensure_airport_exists(flight_segment["arrival_airport_code"])
+
+    def _calculate_distance(self, flight_segments: list[dict]):
+        ordered_segments = sorted(flight_segments, key=lambda item: item["sequence_number"])
+        return self.airport_service.calculate_distance(
+            from_airport_code=ordered_segments[0]["departure_airport_code"],
+            to_airport_code=ordered_segments[-1]["arrival_airport_code"],
+        )
+
+    def _calculate_compensation_amount(self, distance_km):
+        if distance_km < COMPENSATION_THRESHOLD_SHORT_HAUL_KM:
+            return COMPENSATION_AMOUNT_SHORT_HAUL_EUR
+        if distance_km <= COMPENSATION_THRESHOLD_MEDIUM_HAUL_KM:
+            return COMPENSATION_AMOUNT_MEDIUM_HAUL_EUR
+        return COMPENSATION_AMOUNT_LONG_HAUL_EUR
 
     def _resolve_owner(self, *, authenticated_user, passenger_email: str, first_name: str, last_name: str):
         if authenticated_user is not None:

@@ -1,9 +1,11 @@
 from datetime import date
+from decimal import Decimal
 
 import pytest
 from django.core.exceptions import ValidationError
 
 from apps.cases.models import Case
+from apps.cases.services.airport_service import AirportDistanceResult
 
 
 @pytest.mark.django_db
@@ -15,6 +17,8 @@ def test_anonymous_submission_creates_user_and_case(case_creation_service, valid
 
     assert case.owner.email == valid_case_payload["passenger"]["email"]
     assert case.status == "NEW"
+    assert case.orthodromic_distance_km == Decimal("1871.00")
+    assert case.compensation_amount_eur == 400
     assert case.flight_segments.count() == 1
     assert case.documents.count() == 2
 
@@ -77,3 +81,57 @@ def test_missing_gdpr_consent_is_rejected(case_creation_service, valid_case_payl
 
     with pytest.raises(ValidationError, match="GDPR consent is required"):
         case_creation_service.create_case(authenticated_user=None, validated_data=valid_case_payload)
+
+
+@pytest.mark.django_db
+def test_distance_uses_first_departure_and_final_arrival(valid_case_payload):
+    class DistanceAwareAirportService:
+        def __init__(self):
+            self.distance_calls = []
+
+        def ensure_airport_exists(self, airport_code):
+            return None
+
+        def calculate_distance(self, *, from_airport_code, to_airport_code):
+            self.distance_calls.append((from_airport_code, to_airport_code))
+            return AirportDistanceResult(
+                from_airport_code=from_airport_code,
+                to_airport_code=to_airport_code,
+                kilometers=Decimal("3600.00"),
+            )
+
+    airport_service = DistanceAwareAirportService()
+    service = case_creation_service = __import__(
+        "apps.cases.services.case_service", fromlist=["CaseCreationService"]
+    ).CaseCreationService(
+        account_service=__import__(
+            "apps.cases.services.account_service", fromlist=["PassengerAccountService"]
+        ).PassengerAccountService(),
+        airport_service=airport_service,
+    )
+
+    valid_case_payload["flight_segments"] = [
+        {
+            "sequence_number": 1,
+            "departure_airport_code": "OTP",
+            "arrival_airport_code": "CDG",
+            "flight_number": "AF1089",
+            "flight_date": date(2026, 7, 23),
+            "airline": "Air France",
+            "is_problem_flight": True,
+        },
+        {
+            "sequence_number": 2,
+            "departure_airport_code": "CDG",
+            "arrival_airport_code": "MAD",
+            "flight_number": "AF1401",
+            "flight_date": date(2026, 7, 23),
+            "airline": "Air France",
+            "is_problem_flight": False,
+        },
+    ]
+
+    case = service.create_case(authenticated_user=None, validated_data=valid_case_payload)
+
+    assert airport_service.distance_calls == [("OTP", "MAD")]
+    assert case.compensation_amount_eur == 600

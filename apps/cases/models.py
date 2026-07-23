@@ -10,6 +10,8 @@ class Case(models.Model):
     contact_email = models.EmailField()
     gdpr_consent = models.BooleanField()
     gdpr_consented_at = models.DateTimeField()
+    orthodromic_distance_km = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    compensation_amount_eur = models.PositiveIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
