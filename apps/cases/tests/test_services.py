@@ -17,6 +17,8 @@ def test_anonymous_submission_creates_user_and_case(case_creation_service, valid
 
     assert case.owner.email == valid_case_payload["passenger"]["email"]
     assert case.status == "NEW"
+    assert case.disruption_type == "DELAY"
+    assert case.incident_description == "The aircraft arrived more than three hours late at the final destination."
     assert case.orthodromic_distance_km == Decimal("1871.00")
     assert case.compensation_amount_eur == 400
     assert case.flight_segments.count() == 1
@@ -80,6 +82,14 @@ def test_missing_gdpr_consent_is_rejected(case_creation_service, valid_case_payl
     valid_case_payload["gdpr_consent"] = False
 
     with pytest.raises(ValidationError, match="GDPR consent is required"):
+        case_creation_service.create_case(authenticated_user=None, validated_data=valid_case_payload)
+
+
+@pytest.mark.django_db
+def test_missing_incident_description_is_rejected(case_creation_service, valid_case_payload):
+    valid_case_payload["disruption_details"]["incident_description"] = "   "
+
+    with pytest.raises(ValidationError, match="Incident description is required"):
         case_creation_service.create_case(authenticated_user=None, validated_data=valid_case_payload)
 
 

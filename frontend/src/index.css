@@ -49,7 +49,9 @@ a {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -233,7 +235,9 @@ label {
   font-size: 0.95rem;
 }
 
-input {
+input,
+select,
+textarea {
   width: 100%;
   padding: 12px 14px;
   border-radius: 16px;
@@ -242,9 +246,16 @@ input {
   color: var(--ink);
 }
 
-input:focus {
+input:focus,
+select:focus,
+textarea:focus {
   outline: 2px solid rgba(14, 116, 144, 0.18);
   border-color: rgba(14, 116, 144, 0.35);
+}
+
+textarea {
+  resize: vertical;
+  min-height: 140px;
 }
 
 .checkbox-row {
@@ -353,6 +364,20 @@ input:focus {
 .compensation-panel {
   display: grid;
   gap: 16px;
+}
+
+.disruption-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.disruption-grid {
+  align-items: start;
+}
+
+.character-count {
+  justify-self: end;
+  font-size: 0.85rem;
 }
 
 .preview-grid {

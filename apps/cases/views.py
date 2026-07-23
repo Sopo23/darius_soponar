@@ -59,6 +59,16 @@ class CaseCreateView(APIView):
             "id": case.id,
             "status": case.status,
             "contact_email": case.contact_email,
+            "disruption_details": {
+                "disruption_type": case.disruption_type,
+                "cancellation_notice_timing": case.cancellation_notice_timing,
+                "delay_arrival_timing": case.delay_arrival_timing,
+                "denied_boarding_voluntary": case.denied_boarding_voluntary,
+                "denied_boarding_reason": case.denied_boarding_reason,
+                "airline_motive_known": case.airline_motive_known,
+                "airline_motive_details": case.airline_motive_details,
+                "incident_description": case.incident_description,
+            },
             "orthodromic_distance_km": (
                 f"{case.orthodromic_distance_km:.2f}" if case.orthodromic_distance_km is not None else None
             ),

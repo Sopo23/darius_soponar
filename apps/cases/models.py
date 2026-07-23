@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.db import models
 
-from .constants import CaseStatus, DocumentType
+from .constants import CaseStatus, DisruptionType, DocumentType
 
 
 class Case(models.Model):
@@ -10,6 +10,14 @@ class Case(models.Model):
     contact_email = models.EmailField()
     gdpr_consent = models.BooleanField()
     gdpr_consented_at = models.DateTimeField()
+    disruption_type = models.CharField(max_length=32, choices=DisruptionType.choices, null=True, blank=True)
+    cancellation_notice_timing = models.CharField(max_length=32, null=True, blank=True)
+    delay_arrival_timing = models.CharField(max_length=32, null=True, blank=True)
+    denied_boarding_voluntary = models.CharField(max_length=16, null=True, blank=True)
+    denied_boarding_reason = models.CharField(max_length=64, null=True, blank=True)
+    airline_motive_known = models.CharField(max_length=16, null=True, blank=True)
+    airline_motive_details = models.CharField(max_length=64, null=True, blank=True)
+    incident_description = models.TextField(null=True, blank=True)
     orthodromic_distance_km = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     compensation_amount_eur = models.PositiveIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

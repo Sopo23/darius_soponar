@@ -10,6 +10,7 @@ class CaseAdmin(admin.ModelAdmin):
         "owner",
         "status",
         "contact_email",
+        "disruption_type",
         "orthodromic_distance_km",
         "compensation_amount_eur",
         "created_at",

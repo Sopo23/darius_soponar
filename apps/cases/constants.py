@@ -20,6 +20,12 @@ class DocumentType(models.TextChoices):
     ID_OR_PASSPORT = "ID_OR_PASSPORT", "ID or Passport"
 
 
+class DisruptionType(models.TextChoices):
+    CANCELLATION = "CANCELLATION", "Cancellation"
+    DELAY = "DELAY", "Delay"
+    DENIED_BOARDING = "DENIED_BOARDING", "Denied Boarding"
+
+
 ALLOWED_DOCUMENT_EXTENSIONS = {".pdf", ".jpg", ".jpeg"}
 MAX_DOCUMENT_SIZE_BYTES = 5 * 1024 * 1024
 MAX_CONNECTING_FLIGHTS = 4

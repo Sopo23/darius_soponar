@@ -31,14 +31,17 @@ class CaseCreationService:
             "flight_segments": [*validated_data["flight_segments"]],
             "documents": [*validated_data["documents"]],
             "passenger": {**validated_data["passenger"]},
+            "disruption_details": {**validated_data["disruption_details"]},
         }
         flight_segments = list(validated_data.pop("flight_segments"))
         documents = list(validated_data.pop("documents"))
         passenger = validated_data.pop("passenger")
+        disruption_details = validated_data.pop("disruption_details")
 
         self._validate_flight_segments(flight_segments)
         self._validate_documents(documents)
         self._validate_gdpr_consent(validated_data.get("gdpr_consent"))
+        self._validate_disruption_details(disruption_details)
         self._validate_airports(flight_segments)
         distance_result = self._calculate_distance(flight_segments)
         compensation_amount = self._calculate_compensation_amount(distance_result.kilometers)
@@ -55,6 +58,14 @@ class CaseCreationService:
             contact_email=passenger["email"],
             gdpr_consent=True,
             gdpr_consented_at=timezone.now(),
+            disruption_type=disruption_details.get("disruption_type"),
+            cancellation_notice_timing=disruption_details.get("cancellation_notice_timing") or "",
+            delay_arrival_timing=disruption_details.get("delay_arrival_timing") or "",
+            denied_boarding_voluntary=disruption_details.get("denied_boarding_voluntary") or "",
+            denied_boarding_reason=disruption_details.get("denied_boarding_reason") or "",
+            airline_motive_known=disruption_details.get("airline_motive_known") or "",
+            airline_motive_details=disruption_details.get("airline_motive_details") or "",
+            incident_description=disruption_details.get("incident_description", "").strip(),
             orthodromic_distance_km=distance_result.kilometers,
             compensation_amount_eur=compensation_amount,
         )
@@ -93,6 +104,18 @@ class CaseCreationService:
     def _validate_gdpr_consent(self, gdpr_consent: bool) -> None:
         if gdpr_consent is not True:
             raise ValidationError({"gdpr_consent": ["GDPR consent is required."]})
+
+    def _validate_disruption_details(self, disruption_details: dict) -> None:
+        disruption_type = disruption_details.get("disruption_type")
+        incident_description = (disruption_details.get("incident_description") or "").strip()
+
+        errors = []
+        if not disruption_type:
+            errors.append("Disruption type is required.")
+        if not incident_description:
+            errors.append("Incident description is required.")
+        if errors:
+            raise ValidationError({"disruption_details": errors})
 
     def _validate_airports(self, flight_segments: Iterable[dict]) -> None:
         for flight_segment in flight_segments:

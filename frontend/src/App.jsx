@@ -414,6 +414,7 @@ function ResetPasswordPage({ onSessionChange }) {
 function CaseCreatePage({ session }) {
   const [passenger, setPassenger] = useState(() => defaultPassenger(session.user))
   const [flightSegments, setFlightSegments] = useState([createFlightSegment(1, true)])
+  const [disruptionDetails, setDisruptionDetails] = useState(() => defaultDisruptionDetails())
   const [documents, setDocuments] = useState({ boardingPass: null, idDocument: null })
   const [airportQuery, setAirportQuery] = useState('')
   const [airportResults, setAirportResults] = useState([])
@@ -533,12 +534,19 @@ function CaseCreatePage({ session }) {
 
   async function handleSubmit(event) {
     event.preventDefault()
+    const disruptionError = getDisruptionValidationError(disruptionDetails)
+    if (disruptionError) {
+      setSubmitState({ busy: false, error: disruptionError, success: '' })
+      return
+    }
+
     setSubmitState({ busy: true, error: '', success: '' })
 
     const formData = new FormData()
     formData.append('passenger', JSON.stringify(passenger))
     formData.append('gdpr_consent', String(passenger.gdpr_consent))
     formData.append('flight_segments', JSON.stringify(flightSegments))
+    formData.append('disruption_details', JSON.stringify(disruptionDetails))
 
     if (documents.boardingPass) {
       formData.append('document_types', 'BOARDING_PASS')
@@ -579,10 +587,10 @@ function CaseCreatePage({ session }) {
       <section className="panel panel-wide">
         <div className="section-header">
           <div>
-            <p className="eyebrow">CASE_01</p>
+            <p className="eyebrow">CASE_01 / CASE_02 / CASE_03</p>
             <h2>Create a compensation case</h2>
           </div>
-          <span className="status-pill">Parts 2 and 3 intentionally excluded</span>
+          <span className="status-pill">Disruption details enabled</span>
         </div>
 
         <form className="case-form" onSubmit={handleSubmit}>
@@ -768,6 +776,177 @@ function CaseCreatePage({ session }) {
             {compensationPreview.error ? <p className="feedback error">{compensationPreview.error}</p> : null}
           </section>
 
+          <section className="subpanel disruption-panel">
+            <div className="section-header compact">
+              <div>
+                <h3>CASE_03 disruption details</h3>
+                <p className="helper-text">
+                  Tell us what type of disruption happened and add a short incident summary so the
+                  case can be assessed accurately.
+                </p>
+              </div>
+              <span className="status-pill neutral-pill">Frontend completion enforced</span>
+            </div>
+
+            <div className="form-section-grid disruption-grid">
+              <label>
+                Type of disruption
+                <select
+                  value={disruptionDetails.disruption_type}
+                  onChange={(event) => setDisruptionDetails((current) => sanitizeDisruptionDetails({
+                    ...current,
+                    disruption_type: event.target.value,
+                  }))}
+                  required
+                >
+                  <option value="">Select disruption type</option>
+                  <option value="CANCELLATION">Cancellation</option>
+                  <option value="DELAY">Delay</option>
+                  <option value="DENIED_BOARDING">Denied boarding</option>
+                </select>
+              </label>
+
+              {disruptionDetails.disruption_type === 'CANCELLATION' ? (
+                <label>
+                  How many days before cancellation has the airline informed?
+                  <select
+                    value={disruptionDetails.cancellation_notice_timing}
+                    onChange={(event) => setDisruptionDetails((current) => sanitizeDisruptionDetails({
+                      ...current,
+                      cancellation_notice_timing: event.target.value,
+                    }))}
+                    required
+                  >
+                    <option value="">Select notice timing</option>
+                    <option value=">14_DAYS">More than 14 days</option>
+                    <option value="<14_DAYS">Less than 14 days</option>
+                    <option value="FLIGHT_DAY">On flight day</option>
+                  </select>
+                </label>
+              ) : null}
+
+              {disruptionDetails.disruption_type === 'DELAY' ? (
+                <label>
+                  How late arrived to final destination?
+                  <select
+                    value={disruptionDetails.delay_arrival_timing}
+                    onChange={(event) => setDisruptionDetails((current) => sanitizeDisruptionDetails({
+                      ...current,
+                      delay_arrival_timing: event.target.value,
+                    }))}
+                    required
+                  >
+                    <option value="">Select arrival delay</option>
+                    <option value="<3H">Less than 3 hours</option>
+                    <option value=">3H">More than 3 hours</option>
+                    <option value="CONNECTION_LOST">Connection flight lost</option>
+                  </select>
+                </label>
+              ) : null}
+
+              {disruptionDetails.disruption_type === 'DENIED_BOARDING' ? (
+                <>
+                  <label>
+                    Did you give up your seat voluntarily?
+                    <select
+                      value={disruptionDetails.denied_boarding_voluntary}
+                      onChange={(event) => setDisruptionDetails((current) => sanitizeDisruptionDetails({
+                        ...current,
+                        denied_boarding_voluntary: event.target.value,
+                      }))}
+                      required
+                    >
+                      <option value="">Select answer</option>
+                      <option value="YES">Yes</option>
+                      <option value="NO">No</option>
+                    </select>
+                  </label>
+
+                  {disruptionDetails.denied_boarding_voluntary === 'NO' ? (
+                    <label>
+                      Reason behind denial of boarding
+                      <select
+                        value={disruptionDetails.denied_boarding_reason}
+                        onChange={(event) => setDisruptionDetails((current) => sanitizeDisruptionDetails({
+                          ...current,
+                          denied_boarding_reason: event.target.value,
+                        }))}
+                        required
+                      >
+                        <option value="">Select reason</option>
+                        <option value="FLIGHT_OVERBOOKED">Flight overbooked</option>
+                        <option value="AGGRESSIVE_BEHAVIOR">Aggressive behavior with staff</option>
+                        <option value="INTOXICATION">Intoxication</option>
+                        <option value="UNSPECIFIED_REASON">Unspecified reason</option>
+                      </select>
+                    </label>
+                  ) : null}
+                </>
+              ) : null}
+
+              {showsAirlineMotiveFields(disruptionDetails.disruption_type) ? (
+                <>
+                  <label>
+                    Did the airline mention disruption motive?
+                    <select
+                      value={disruptionDetails.airline_motive_known}
+                      onChange={(event) => setDisruptionDetails((current) => sanitizeDisruptionDetails({
+                        ...current,
+                        airline_motive_known: event.target.value,
+                      }))}
+                      required
+                    >
+                      <option value="">Select answer</option>
+                      <option value="YES">Yes</option>
+                      <option value="NO">No</option>
+                      <option value="UNKNOWN">I don't know</option>
+                    </select>
+                  </label>
+
+                  {disruptionDetails.airline_motive_known === 'YES' ? (
+                    <label>
+                      What was the motive communicated by the airline?
+                      <select
+                        value={disruptionDetails.airline_motive_details}
+                        onChange={(event) => setDisruptionDetails((current) => sanitizeDisruptionDetails({
+                          ...current,
+                          airline_motive_details: event.target.value,
+                        }))}
+                        required
+                      >
+                        <option value="">Select motive</option>
+                        <option value="TECHNICAL_PROBLEM">Technical problem</option>
+                        <option value="METEOROLOGICAL_CONDITIONS">Meteorological conditions</option>
+                        <option value="STRIKE">Strike</option>
+                        <option value="AIRPORT_PROBLEMS">Problems with airport</option>
+                        <option value="CREW_PROBLEMS">Crew problems</option>
+                        <option value="OTHER_MOTIVES">Other motives</option>
+                      </select>
+                    </label>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+
+            <label>
+              Describe in short what has happened
+              <textarea
+                value={disruptionDetails.incident_description}
+                onChange={(event) => setDisruptionDetails((current) => ({
+                  ...current,
+                  incident_description: event.target.value,
+                }))}
+                rows="6"
+                maxLength="4000"
+                placeholder="Add the sequence of events, what the airline communicated, and how the disruption affected your journey."
+                required
+              />
+            </label>
+            <p className="helper-text character-count">
+              {disruptionDetails.incident_description.length}/4000 characters
+            </p>
+          </section>
+
           <div className="form-section-grid">
             <section className="subpanel">
               <h3>Required documents</h3>
@@ -834,7 +1013,7 @@ function CaseCreatePage({ session }) {
 
           <div className="form-actions">
             <button type="submit" disabled={submitState.busy}>
-              {submitState.busy ? 'Submitting case...' : 'Submit CASE_01 and CASE_02'}
+              {submitState.busy ? 'Submitting case...' : 'Submit CASE_01, CASE_02, and CASE_03'}
             </button>
             {submitState.error ? <p className="feedback error">{submitState.error}</p> : null}
             {submitState.success ? <p className="feedback success">{submitState.success}</p> : null}
@@ -864,6 +1043,83 @@ function createFlightSegment(sequenceNumber, isProblemFlight) {
     airline: '',
     is_problem_flight: isProblemFlight,
   }
+}
+
+function defaultDisruptionDetails() {
+  return {
+    disruption_type: '',
+    cancellation_notice_timing: '',
+    delay_arrival_timing: '',
+    denied_boarding_voluntary: '',
+    denied_boarding_reason: '',
+    airline_motive_known: '',
+    airline_motive_details: '',
+    incident_description: '',
+  }
+}
+
+function showsAirlineMotiveFields(disruptionType) {
+  return disruptionType === 'CANCELLATION' || disruptionType === 'DELAY'
+}
+
+function sanitizeDisruptionDetails(details) {
+  const nextDetails = { ...details }
+
+  if (nextDetails.disruption_type !== 'CANCELLATION') {
+    nextDetails.cancellation_notice_timing = ''
+  }
+  if (nextDetails.disruption_type !== 'DELAY') {
+    nextDetails.delay_arrival_timing = ''
+  }
+  if (nextDetails.disruption_type !== 'DENIED_BOARDING') {
+    nextDetails.denied_boarding_voluntary = ''
+    nextDetails.denied_boarding_reason = ''
+  }
+  if (nextDetails.denied_boarding_voluntary !== 'NO') {
+    nextDetails.denied_boarding_reason = ''
+  }
+  if (!showsAirlineMotiveFields(nextDetails.disruption_type)) {
+    nextDetails.airline_motive_known = ''
+    nextDetails.airline_motive_details = ''
+  }
+  if (nextDetails.airline_motive_known !== 'YES') {
+    nextDetails.airline_motive_details = ''
+  }
+
+  return nextDetails
+}
+
+function getDisruptionValidationError(disruptionDetails) {
+  if (!disruptionDetails.disruption_type) {
+    return 'Please select the type of disruption.'
+  }
+  if (disruptionDetails.disruption_type === 'CANCELLATION' && !disruptionDetails.cancellation_notice_timing) {
+    return 'Please specify when the airline informed you about the cancellation.'
+  }
+  if (disruptionDetails.disruption_type === 'DELAY' && !disruptionDetails.delay_arrival_timing) {
+    return 'Please specify how late you arrived at the final destination.'
+  }
+  if (disruptionDetails.disruption_type === 'DENIED_BOARDING' && !disruptionDetails.denied_boarding_voluntary) {
+    return 'Please specify whether you gave up your seat voluntarily.'
+  }
+  if (
+    disruptionDetails.disruption_type === 'DENIED_BOARDING' &&
+    disruptionDetails.denied_boarding_voluntary === 'NO' &&
+    !disruptionDetails.denied_boarding_reason
+  ) {
+    return 'Please specify the reason behind the denied boarding.'
+  }
+  if (showsAirlineMotiveFields(disruptionDetails.disruption_type) && !disruptionDetails.airline_motive_known) {
+    return 'Please specify whether the airline mentioned a disruption motive.'
+  }
+  if (disruptionDetails.airline_motive_known === 'YES' && !disruptionDetails.airline_motive_details) {
+    return 'Please specify the motive communicated by the airline.'
+  }
+  if (!disruptionDetails.incident_description.trim()) {
+    return 'Please describe what happened during the disruption.'
+  }
+
+  return ''
 }
 
 function App() {

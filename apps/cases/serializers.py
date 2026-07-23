@@ -8,6 +8,7 @@ from rest_framework import serializers
 
 from apps.cases.constants import (
     ALLOWED_DOCUMENT_EXTENSIONS,
+    DisruptionType,
     DocumentType,
     MAX_DOCUMENT_SIZE_BYTES,
 )
@@ -49,11 +50,23 @@ class CaseDocumentSerializer(serializers.Serializer):
         return value
 
 
+class DisruptionDetailsSerializer(serializers.Serializer):
+    disruption_type = serializers.ChoiceField(choices=DisruptionType.choices)
+    cancellation_notice_timing = serializers.CharField(max_length=32, required=False, allow_blank=True)
+    delay_arrival_timing = serializers.CharField(max_length=32, required=False, allow_blank=True)
+    denied_boarding_voluntary = serializers.CharField(max_length=16, required=False, allow_blank=True)
+    denied_boarding_reason = serializers.CharField(max_length=64, required=False, allow_blank=True)
+    airline_motive_known = serializers.CharField(max_length=16, required=False, allow_blank=True)
+    airline_motive_details = serializers.CharField(max_length=64, required=False, allow_blank=True)
+    incident_description = serializers.CharField(max_length=4000, allow_blank=True)
+
+
 class CaseCreateSerializer(serializers.Serializer):
     passenger = PassengerSerializer()
     gdpr_consent = serializers.BooleanField()
     flight_segments = FlightSegmentSerializer(many=True)
     documents = CaseDocumentSerializer(many=True)
+    disruption_details = DisruptionDetailsSerializer()
 
     def to_internal_value(self, data):
         normalized_data = self._normalize_multipart_payload(data)
@@ -73,7 +86,7 @@ class CaseCreateSerializer(serializers.Serializer):
             "gdpr_consent": data.get("gdpr_consent"),
         }
 
-        for nested_field in ("passenger", "flight_segments"):
+        for nested_field in ("passenger", "flight_segments", "disruption_details"):
             raw_value = data.get(nested_field)
             if isinstance(raw_value, str):
                 normalized[nested_field] = self._parse_json_string(field_name=nested_field, raw_value=raw_value)

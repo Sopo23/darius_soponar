@@ -58,6 +58,13 @@ def valid_case_payload(uploaded_documents):
             "last_name": "Traveler",
         },
         "gdpr_consent": True,
+        "disruption_details": {
+            "disruption_type": "DELAY",
+            "delay_arrival_timing": ">3H",
+            "airline_motive_known": "YES",
+            "airline_motive_details": "Technical problem",
+            "incident_description": "The aircraft arrived more than three hours late at the final destination.",
+        },
         "flight_segments": [
             {
                 "sequence_number": 1,
@@ -84,6 +91,15 @@ def multipart_case_payload():
             }
         ),
         "gdpr_consent": "true",
+        "disruption_details": json.dumps(
+            {
+                "disruption_type": "DELAY",
+                "delay_arrival_timing": ">3H",
+                "airline_motive_known": "YES",
+                "airline_motive_details": "Technical problem",
+                "incident_description": "The aircraft arrived more than three hours late at the final destination.",
+            }
+        ),
         "flight_segments": json.dumps(
             [
                 {
