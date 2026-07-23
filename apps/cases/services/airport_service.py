@@ -1,0 +1,105 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+import requests
+from django.conf import settings
+
+
+class AirportLookupError(Exception):
+    pass
+
+
+class AirportProviderUnavailableError(AirportLookupError):
+    pass
+
+
+@dataclass(slots=True)
+class AirportRecord:
+    code: str
+    name: str
+    city: str | None
+    country: str | None
+
+
+class AirportService:
+    def __init__(self, *, base_url: str | None = None, session: requests.Session | None = None) -> None:
+        self.base_url = (base_url or settings.AIRPORTGAP_BASE_URL).rstrip("/")
+        self.session = session or requests.Session()
+        self.verify = settings.AIRPORTGAP_CA_BUNDLE or settings.AIRPORTGAP_VERIFY_SSL
+
+    def search(self, query: str) -> list[AirportRecord]:
+        normalized_query = query.strip()
+        if not normalized_query:
+            return []
+
+        if len(normalized_query) == 3 and normalized_query.isalpha():
+            try:
+                return [self.get_airport(normalized_query)]
+            except AirportProviderUnavailableError:
+                raise
+            except AirportLookupError:
+                return []
+
+        payload = self._get_json("/api/airports")
+        matches = []
+        lowered_query = normalized_query.lower()
+        for item in payload.get("data", []):
+            airport = self._build_airport_record(item)
+            if airport is None:
+                continue
+            haystacks = [airport.code.lower(), airport.name.lower()]
+            if airport.city:
+                haystacks.append(airport.city.lower())
+            if airport.country:
+                haystacks.append(airport.country.lower())
+            if any(lowered_query in haystack for haystack in haystacks):
+                matches.append(airport)
+        return matches
+
+    def get_airport(self, airport_code: str) -> AirportRecord:
+        normalized_code = airport_code.upper()
+        payload = self._get_json(f"/api/airports/{normalized_code}", allow_not_found=True)
+        airport = self._build_airport_record(payload.get("data"))
+        if airport is None:
+            raise AirportLookupError(f"Airport code {normalized_code} is invalid")
+        return airport
+
+    def ensure_airport_exists(self, airport_code: str) -> AirportRecord:
+        return self.get_airport(airport_code)
+
+    def _get_json(self, path: str, *, allow_not_found: bool = False) -> dict:
+        try:
+            response = self.session.get(
+                f"{self.base_url}{path}",
+                timeout=10,
+                verify=self.verify,
+            )
+        except requests.exceptions.SSLError as exc:
+            raise AirportProviderUnavailableError(
+                "Airport provider SSL verification failed. Configure AIRPORTGAP_CA_BUNDLE "
+                "or set AIRPORTGAP_VERIFY_SSL=False for local development if your network "
+                "intercepts HTTPS traffic."
+            ) from exc
+        except requests.exceptions.RequestException as exc:
+            raise AirportProviderUnavailableError("Airport provider unavailable") from exc
+
+        if allow_not_found and response.status_code == 404:
+            return {}
+        if response.status_code != 200:
+            raise AirportProviderUnavailableError("Airport provider unavailable")
+        return response.json()
+
+    def _build_airport_record(self, item: dict | None) -> AirportRecord | None:
+        if not item:
+            return None
+        attributes = item.get("attributes", {})
+        iata_code = (attributes.get("iata") or item.get("id") or "").upper()
+        if not iata_code:
+            return None
+        return AirportRecord(
+            code=iata_code,
+            name=attributes.get("name") or iata_code,
+            city=attributes.get("city"),
+            country=attributes.get("country"),
+        )

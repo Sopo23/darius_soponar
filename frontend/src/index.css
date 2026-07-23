@@ -1,0 +1,372 @@
+:root {
+  --ink: #102033;
+  --ink-soft: #4d6177;
+  --surface: #fffdf7;
+  --surface-strong: #ffffff;
+  --panel: rgba(255, 255, 255, 0.9);
+  --panel-border: rgba(16, 32, 51, 0.12);
+  --line: rgba(16, 32, 51, 0.08);
+  --accent: #0e7490;
+  --accent-strong: #155e75;
+  --accent-soft: rgba(14, 116, 144, 0.12);
+  --gold: #d97706;
+  --danger: #b42318;
+  --success: #176448;
+  --shadow: 0 22px 60px rgba(16, 32, 51, 0.12);
+  --font: 'Segoe UI', 'Aptos', sans-serif;
+
+  font-family: var(--font);
+  line-height: 1.5;
+  font-weight: 400;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(14, 116, 144, 0.16), transparent 30%),
+    radial-gradient(circle at top right, rgba(217, 119, 6, 0.16), transparent 26%),
+    linear-gradient(180deg, #f6fbfd 0%, #eef5f8 40%, #fffdf7 100%);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app-shell {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 32px 20px 48px;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  padding: 28px;
+  border: 1px solid var(--panel-border);
+  border-radius: 28px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(246, 251, 253, 0.9));
+  box-shadow: var(--shadow);
+}
+
+.eyebrow,
+.hero-kicker,
+.callout-label {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.72rem;
+  color: var(--accent-strong);
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+h1 {
+  margin-top: 10px;
+  font-size: clamp(2.3rem, 5vw, 4.2rem);
+  line-height: 0.98;
+  max-width: 12ch;
+}
+
+.lede {
+  max-width: 56ch;
+  margin-top: 16px;
+  color: var(--ink-soft);
+}
+
+.topbar-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.topbar-actions a,
+.secondary-button,
+button {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 12px 18px;
+  transition: 180ms ease;
+}
+
+button {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+  color: white;
+  box-shadow: 0 12px 26px rgba(14, 116, 144, 0.22);
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  opacity: 0.7;
+  cursor: wait;
+  transform: none;
+}
+
+.secondary-button,
+.topbar-actions a,
+.text-button {
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--ink);
+  border-color: var(--panel-border);
+  box-shadow: none;
+}
+
+.text-button {
+  padding: 0;
+  border: none;
+}
+
+.page-grid,
+.case-page {
+  display: grid;
+  gap: 24px;
+  margin-top: 28px;
+}
+
+.page-grid {
+  grid-template-columns: 1.15fr 1fr;
+}
+
+.hero-card,
+.stack-card,
+.panel,
+.subpanel {
+  border: 1px solid var(--panel-border);
+  border-radius: 26px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.hero-card,
+.stack-card {
+  padding: 28px;
+}
+
+.stack-card {
+  display: grid;
+  gap: 18px;
+}
+
+.panel,
+.subpanel {
+  padding: 24px;
+}
+
+.wide-panel,
+.panel-wide {
+  padding: 28px;
+}
+
+.callouts {
+  display: grid;
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.callouts article {
+  padding: 18px;
+  border-radius: 22px;
+  background: var(--accent-soft);
+  border: 1px solid rgba(14, 116, 144, 0.1);
+}
+
+.callouts strong {
+  display: block;
+  margin-top: 8px;
+}
+
+.form-stack,
+.case-form {
+  display: grid;
+  gap: 14px;
+}
+
+.form-section-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+label {
+  display: grid;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--surface-strong);
+  color: var(--ink);
+}
+
+input:focus {
+  outline: 2px solid rgba(14, 116, 144, 0.18);
+  border-color: rgba(14, 116, 144, 0.35);
+}
+
+.checkbox-row {
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 12px;
+}
+
+.checkbox-row input {
+  width: auto;
+  margin-top: 4px;
+}
+
+.feedback {
+  padding: 12px 14px;
+  border-radius: 16px;
+}
+
+.feedback.error {
+  color: var(--danger);
+  background: rgba(180, 35, 24, 0.08);
+}
+
+.feedback.success {
+  color: var(--success);
+  background: rgba(23, 100, 72, 0.1);
+}
+
+.single-card-page {
+  margin-top: 28px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.section-header.compact {
+  margin-bottom: 12px;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: rgba(217, 119, 6, 0.12);
+  color: #9a5a0a;
+  font-size: 0.85rem;
+}
+
+.flight-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+.flight-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.flight-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.helper-text {
+  color: var(--ink-soft);
+}
+
+.airport-results {
+  list-style: none;
+  padding: 0;
+  margin: 18px 0 0;
+  display: grid;
+  gap: 10px;
+}
+
+.airport-results li {
+  display: grid;
+  gap: 2px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--line);
+}
+
+.airport-results strong {
+  color: var(--accent-strong);
+}
+
+.airport-results small {
+  color: var(--ink-soft);
+}
+
+.form-actions {
+  display: grid;
+  gap: 12px;
+}
+
+@media (max-width: 920px) {
+  .topbar,
+  .page-grid,
+  .form-section-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    padding: 24px;
+  }
+
+  .topbar-actions {
+    width: 100%;
+  }
+}
