@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import DatabaseError
 from rest_framework import permissions, status
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -59,16 +60,8 @@ class CaseCreateView(APIView):
             "id": case.id,
             "status": case.status,
             "contact_email": case.contact_email,
-            "disruption_details": {
-                "disruption_type": case.disruption_type,
-                "cancellation_notice_timing": case.cancellation_notice_timing,
-                "delay_arrival_timing": case.delay_arrival_timing,
-                "denied_boarding_voluntary": case.denied_boarding_voluntary,
-                "denied_boarding_reason": case.denied_boarding_reason,
-                "airline_motive_known": case.airline_motive_known,
-                "airline_motive_details": case.airline_motive_details,
-                "incident_description": case.incident_description,
-            },
+            "colleague": case.colleague_id,
+            "disruption_details": service.get_disruption_details(case),
             "orthodromic_distance_km": (
                 f"{case.orthodromic_distance_km:.2f}" if case.orthodromic_distance_km is not None else None
             ),
@@ -96,6 +89,14 @@ class CaseCreateView(APIView):
             ],
         }
         return Response(response_payload, status=status.HTTP_201_CREATED)
+
+    def handle_exception(self, exc):
+        if isinstance(exc, DatabaseError):
+            return Response(
+                {"detail": "The case could not be saved. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        return super().handle_exception(exc)
 
 
 class AirportSearchView(APIView):

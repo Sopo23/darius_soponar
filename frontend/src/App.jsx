@@ -574,7 +574,8 @@ function CaseCreatePage({ session }) {
         busy: false,
         error: '',
         success:
-          `Case #${payload.id} created with status ${payload.status}. ` +
+          `Case #${payload.id} created on ${new Date(payload.created_at).toLocaleString()}. ` +
+          `Status: ${payload.status}. Colleague: ${payload.colleague ?? 'Unassigned'}. ` +
           `Distance: ${payload.orthodromic_distance_km} km. Compensation: €${payload.compensation_amount_eur}.`,
       })
     } catch (error) {
@@ -587,10 +588,10 @@ function CaseCreatePage({ session }) {
       <section className="panel panel-wide">
         <div className="section-header">
           <div>
-            <p className="eyebrow">CASE_01 / CASE_02 / CASE_03</p>
+            <p className="eyebrow">CASE_01 / CASE_02 / CASE_03 / CASE_04</p>
             <h2>Create a compensation case</h2>
           </div>
-          <span className="status-pill">Disruption details enabled</span>
+          <span className="status-pill">Transactional case creation enabled</span>
         </div>
 
         <form className="case-form" onSubmit={handleSubmit}>

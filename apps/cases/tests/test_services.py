@@ -3,6 +3,7 @@ from decimal import Decimal
 
 import pytest
 from django.core.exceptions import ValidationError
+from django.db import DatabaseError
 
 from apps.cases.models import Case
 from apps.cases.services.airport_service import AirportDistanceResult, AirportService
@@ -16,9 +17,10 @@ def test_anonymous_submission_creates_user_and_case(case_creation_service, valid
     )
 
     assert case.owner.email == valid_case_payload["passenger"]["email"]
+    assert case.colleague is None
     assert case.status == "NEW"
-    assert case.disruption_type == "DELAY"
-    assert case.incident_description == "The aircraft arrived more than three hours late at the final destination."
+    assert case.disruption.disruption_type == "DELAY"
+    assert case.disruption.incident_description == "The aircraft arrived more than three hours late at the final destination."
     assert case.orthodromic_distance_km == Decimal("1871.00")
     assert case.compensation_amount_eur == 400
     assert case.flight_segments.count() == 1
@@ -171,3 +173,16 @@ def test_airport_search_uses_local_index(monkeypatch):
     results = service.search('bucharest')
 
     assert [airport.code for airport in results] == ['OTP']
+
+
+@pytest.mark.django_db
+def test_case_creation_rolls_back_when_disruption_save_fails(case_creation_service, valid_case_payload, monkeypatch):
+    monkeypatch.setattr(
+        "apps.cases.services.case_service.Disruption.objects.create",
+        lambda **kwargs: (_ for _ in ()).throw(DatabaseError("database write failed")),
+    )
+
+    with pytest.raises(DatabaseError, match="database write failed"):
+        case_creation_service.create_case(authenticated_user=None, validated_data=valid_case_payload)
+
+    assert Case.objects.count() == 0

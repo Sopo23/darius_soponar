@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Case, CaseDocument, FlightSegment
+from .models import Case, CaseDocument, Disruption, FlightSegment
 
 
 @admin.register(Case)
@@ -8,6 +8,7 @@ class CaseAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "owner",
+        "colleague",
         "status",
         "contact_email",
         "disruption_type",
@@ -18,6 +19,13 @@ class CaseAdmin(admin.ModelAdmin):
     list_filter = ("status", "created_at")
     search_fields = ("contact_email", "owner__email")
     readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(Disruption)
+class DisruptionAdmin(admin.ModelAdmin):
+    list_display = ("id", "case", "disruption_type", "airline_motive_known")
+    list_filter = ("disruption_type", "airline_motive_known")
+    search_fields = ("case__contact_email", "case__owner__email", "incident_description")
 
 
 @admin.register(FlightSegment)

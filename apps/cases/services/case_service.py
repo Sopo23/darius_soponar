@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import transaction
 from django.utils import timezone
 
@@ -16,7 +16,7 @@ from apps.cases.constants import (
     MAX_CONNECTING_FLIGHTS,
     MAX_TOTAL_FLIGHTS,
 )
-from apps.cases.models import Case, CaseDocument, FlightSegment
+from apps.cases.models import Case, CaseDocument, Disruption, FlightSegment
 
 
 class CaseCreationService:
@@ -58,18 +58,11 @@ class CaseCreationService:
             contact_email=passenger["email"],
             gdpr_consent=True,
             gdpr_consented_at=timezone.now(),
-            disruption_type=disruption_details.get("disruption_type"),
-            cancellation_notice_timing=disruption_details.get("cancellation_notice_timing") or "",
-            delay_arrival_timing=disruption_details.get("delay_arrival_timing") or "",
-            denied_boarding_voluntary=disruption_details.get("denied_boarding_voluntary") or "",
-            denied_boarding_reason=disruption_details.get("denied_boarding_reason") or "",
-            airline_motive_known=disruption_details.get("airline_motive_known") or "",
-            airline_motive_details=disruption_details.get("airline_motive_details") or "",
-            incident_description=disruption_details.get("incident_description", "").strip(),
             orthodromic_distance_km=distance_result.kilometers,
             compensation_amount_eur=compensation_amount,
         )
 
+        self._create_disruption(case=case, disruption_details=disruption_details)
         self._create_flight_segments(case=case, flight_segments=flight_segments)
         self._create_documents(case=case, documents=documents)
 
@@ -156,6 +149,45 @@ class CaseCreationService:
             FlightSegment(case=case, **flight_segment)
             for flight_segment in flight_segments
         )
+
+    def _create_disruption(self, *, case: Case, disruption_details: dict) -> None:
+        Disruption.objects.create(
+            case=case,
+            disruption_type=disruption_details["disruption_type"],
+            cancellation_notice_timing=disruption_details.get("cancellation_notice_timing") or "",
+            delay_arrival_timing=disruption_details.get("delay_arrival_timing") or "",
+            denied_boarding_voluntary=disruption_details.get("denied_boarding_voluntary") or "",
+            denied_boarding_reason=disruption_details.get("denied_boarding_reason") or "",
+            airline_motive_known=disruption_details.get("airline_motive_known") or "",
+            airline_motive_details=disruption_details.get("airline_motive_details") or "",
+            incident_description=disruption_details["incident_description"].strip(),
+        )
+
+    def get_disruption_details(self, case: Case) -> dict:
+        try:
+            disruption = case.disruption
+        except ObjectDoesNotExist:
+            return {
+                "disruption_type": case.disruption_type,
+                "cancellation_notice_timing": case.cancellation_notice_timing,
+                "delay_arrival_timing": case.delay_arrival_timing,
+                "denied_boarding_voluntary": case.denied_boarding_voluntary,
+                "denied_boarding_reason": case.denied_boarding_reason,
+                "airline_motive_known": case.airline_motive_known,
+                "airline_motive_details": case.airline_motive_details,
+                "incident_description": case.incident_description,
+            }
+
+        return {
+            "disruption_type": disruption.disruption_type,
+            "cancellation_notice_timing": disruption.cancellation_notice_timing,
+            "delay_arrival_timing": disruption.delay_arrival_timing,
+            "denied_boarding_voluntary": disruption.denied_boarding_voluntary,
+            "denied_boarding_reason": disruption.denied_boarding_reason,
+            "airline_motive_known": disruption.airline_motive_known,
+            "airline_motive_details": disruption.airline_motive_details,
+            "incident_description": disruption.incident_description,
+        }
 
     def _create_documents(self, *, case: Case, documents: list[dict]) -> None:
         for document in documents:

@@ -6,6 +6,13 @@ from .constants import CaseStatus, DisruptionType, DocumentType
 
 class Case(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="cases")
+    colleague = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="assigned_cases",
+        null=True,
+        blank=True,
+    )
     status = models.CharField(max_length=20, choices=CaseStatus.choices, default=CaseStatus.NEW)
     contact_email = models.EmailField()
     gdpr_consent = models.BooleanField()
@@ -22,6 +29,18 @@ class Case(models.Model):
     compensation_amount_eur = models.PositiveIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+
+class Disruption(models.Model):
+    case = models.OneToOneField(Case, on_delete=models.CASCADE, related_name="disruption")
+    disruption_type = models.CharField(max_length=32, choices=DisruptionType.choices)
+    cancellation_notice_timing = models.CharField(max_length=32, null=True, blank=True)
+    delay_arrival_timing = models.CharField(max_length=32, null=True, blank=True)
+    denied_boarding_voluntary = models.CharField(max_length=16, null=True, blank=True)
+    denied_boarding_reason = models.CharField(max_length=64, null=True, blank=True)
+    airline_motive_known = models.CharField(max_length=16, null=True, blank=True)
+    airline_motive_details = models.CharField(max_length=64, null=True, blank=True)
+    incident_description = models.TextField()
 
 
 class FlightSegment(models.Model):
