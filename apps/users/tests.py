@@ -1,6 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
+from django.core import mail
 from django.test import TestCase
+from django.test.utils import override_settings
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from rest_framework.authtoken.models import Token
@@ -63,6 +65,19 @@ class UserModelTests(TestCase):
 
         self.assertTrue(result.created)
         self.assertTrue(result.user.must_change_password)
+
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+    def test_auto_created_passenger_sends_temporary_password_email(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            PassengerAccountService().resolve_or_create(
+                email="new-passenger@example.com",
+                first_name="New",
+                last_name="Passenger",
+            )
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["new-passenger@example.com"])
+        self.assertIn("Your temporary password is:", mail.outbox[0].body)
 
 
 class UserAuthApiTests(TestCase):

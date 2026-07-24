@@ -1,6 +1,7 @@
 import pytest
 import requests
 from django.db import DatabaseError
+from django.core import mail
 from rest_framework import status
 
 from apps.cases.services.airport_service import AirportProviderUnavailableError, AirportRecord
@@ -34,6 +35,80 @@ def test_public_case_creation_returns_201(api_client, multipart_case_payload, mo
     assert response.data["compensation_amount_eur"] == 400
     assert len(response.data["flight_segments"]) == 1
     assert len(response.data["documents"]) == 2
+
+
+@pytest.mark.django_db
+def test_case_creation_creates_passenger_account_and_emails_password(
+    settings,
+    api_client,
+    multipart_case_payload,
+    monkeypatch,
+    django_capture_on_commit_callbacks,
+):
+    settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+    monkeypatch.setattr(
+        "apps.cases.services.airport_service.AirportService.ensure_airport_exists",
+        lambda self, code: AirportRecord(code=code, name=code, city=None, country=None),
+    )
+    monkeypatch.setattr(
+        "apps.cases.services.airport_service.AirportService.calculate_distance",
+        lambda self, from_airport_code, to_airport_code: __import__(
+            "apps.cases.services.airport_service", fromlist=["AirportDistanceResult"]
+        ).AirportDistanceResult(
+            from_airport_code=from_airport_code,
+            to_airport_code=to_airport_code,
+            kilometers=1871,
+        ),
+    )
+
+    with django_capture_on_commit_callbacks(execute=True):
+        response = api_client.post("/api/cases/", data=multipart_case_payload, format="multipart")
+
+    assert response.status_code == status.HTTP_201_CREATED
+    assert len(mail.outbox) == 1
+    assert mail.outbox[0].to == ["traveler@example.com"]
+    assert "Your temporary password is:" in mail.outbox[0].body
+
+
+@pytest.mark.django_db
+def test_temporary_password_from_case_email_can_be_used_to_log_in(
+    settings,
+    api_client,
+    multipart_case_payload,
+    monkeypatch,
+    django_capture_on_commit_callbacks,
+):
+    settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+    monkeypatch.setattr(
+        "apps.cases.services.airport_service.AirportService.ensure_airport_exists",
+        lambda self, code: AirportRecord(code=code, name=code, city=None, country=None),
+    )
+    monkeypatch.setattr(
+        "apps.cases.services.airport_service.AirportService.calculate_distance",
+        lambda self, from_airport_code, to_airport_code: __import__(
+            "apps.cases.services.airport_service", fromlist=["AirportDistanceResult"]
+        ).AirportDistanceResult(
+            from_airport_code=from_airport_code,
+            to_airport_code=to_airport_code,
+            kilometers=1871,
+        ),
+    )
+
+    with django_capture_on_commit_callbacks(execute=True):
+        create_response = api_client.post("/api/cases/", data=multipart_case_payload, format="multipart")
+
+    assert create_response.status_code == status.HTTP_201_CREATED
+    temporary_password = mail.outbox[0].body.split("Your temporary password is: ", 1)[1].split(".", 1)[0]
+
+    login_response = api_client.post(
+        "/api/auth/login/",
+        data={"email": "traveler@example.com", "password": temporary_password},
+        format="json",
+    )
+
+    assert login_response.status_code == status.HTTP_200_OK
+    assert login_response.data["user"]["email"] == "traveler@example.com"
+    assert login_response.data["user"]["must_change_password"] is True
 
 
 @pytest.mark.django_db
@@ -188,7 +263,8 @@ def test_compensation_preview_returns_distance_and_amount(api_client, monkeypatc
 
 
 @pytest.mark.django_db
-def test_case_creation_returns_json_error_when_database_save_fails(api_client, multipart_case_payload, monkeypatch):
+def test_case_creation_returns_json_error_when_database_save_fails(settings, api_client, multipart_case_payload, monkeypatch):
+    settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
     monkeypatch.setattr(
         "apps.cases.services.case_service.Disruption.objects.create",
         lambda **kwargs: (_ for _ in ()).throw(DatabaseError("database write failed")),
@@ -212,3 +288,4 @@ def test_case_creation_returns_json_error_when_database_save_fails(api_client, m
 
     assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
     assert response.data["detail"] == "The case could not be saved. Please try again."
+    assert len(mail.outbox) == 0

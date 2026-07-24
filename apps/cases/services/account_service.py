@@ -31,15 +31,17 @@ class PassengerAccountService:
             must_change_password=True,
         )
 
-        send_mail(
-            subject="Your AirAssist account was created",
-            message=(
-                "An AirAssist account was created for your compensation case. "
-                f"Your temporary password is: {temporary_password}. "
-                "Please sign in and change it as soon as possible."
-            ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[normalized_email],
+        transaction.on_commit(
+            lambda: send_mail(
+                subject="Your AirAssist account was created",
+                message=(
+                    "An AirAssist account was created for your compensation case. "
+                    f"Your temporary password is: {temporary_password}. "
+                    "Please sign in and change it as soon as possible."
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[normalized_email],
+            )
         )
 
         return AccountResolutionResult(user=user, created=True)

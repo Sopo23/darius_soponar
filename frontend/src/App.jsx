@@ -115,8 +115,8 @@ function AppShell() {
           <p className="eyebrow">AirAssist Frontend Start</p>
           <h1>Passenger intake and account recovery</h1>
           <p className="lede">
-            Backend-connected screens for login, forced password change, reset-password, and
-            `CASE_01` case creation.
+            Backend-connected screens for email login, temporary-password rotation, reset-password,
+            and compensation case creation.
           </p>
         </div>
         <nav className="topbar-actions">
@@ -191,7 +191,8 @@ function HomePage({ onSessionChange, session, sessionStatus }) {
         <h2>{session.user ? `Signed in as ${session.user.email}` : 'Ready for passenger sign-in'}</h2>
         <p>
           Anonymous passengers can still create a case from the form. Registered passengers can
-          sign in here and continue into the same `CASE_01` flow.
+          sign in here with their email and continue into the same case flow. Auto-created
+          passenger accounts must change the emailed temporary password on first login.
         </p>
         <div className="callouts">
           <article>
@@ -208,6 +209,10 @@ function HomePage({ onSessionChange, session, sessionStatus }) {
       <section className="stack-card">
         <article className="panel">
           <h3>Passenger login</h3>
+          <p className="helper-text">
+            Use the email address from your case and the temporary password sent by AirAssist after
+            the case is stored.
+          </p>
           <form className="form-stack" onSubmit={handleLoginSubmit}>
             <label>
               Email
